@@ -15,7 +15,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
     { href: "/dashboard/gestor", label: "Painel do gestor", show: role === "ADMIN" || role === "GESTOR" },
     { href: "/dashboard/prospector", label: "Prospecção", show: role === "ADMIN" || role === "PROSPECTOR" || role === "GERENTE_PROSPECTOR" },
     { href: "/dashboard/sdr", label: "Fila de SDR", show: role === "ADMIN" || role === "SDR" || role === "GERENTE_SDR" },
-    { href: "/dashboard/em-breve", label: "Closer", show: role === "CLOSER" || role === "GERENTE_CLOSER" },
+    { href: "/dashboard/closer", label: "Meus leads", show: role === "ADMIN" || role === "CLOSER" },
+    { href: "/dashboard/gerente-closer", label: "Distribuição", show: role === "ADMIN" || role === "GERENTE_CLOSER" },
     { href: "/dashboard/admin", label: "Administração", show: role === "ADMIN" },
   ];
 

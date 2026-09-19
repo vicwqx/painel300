@@ -28,6 +28,8 @@ const ICONS: Record<string, ComponentType<{ size?: number; strokeWidth?: number 
   "/dashboard/prospector": Target,
   "/dashboard/sdr": Phone,
   "/dashboard/em-breve": Handshake,
+  "/dashboard/closer": Handshake,
+  "/dashboard/gerente-closer": Users,
 };
 
 export function Sidebar({
