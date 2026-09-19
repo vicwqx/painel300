@@ -1,0 +1,158 @@
+"use server";
+
+import { prisma } from "@/lib/prisma";
+import { sessaoCrmObrigatoria, exigirPapel } from "@/lib/crm/sessao";
+import { registrarHistorico } from "@/lib/crm/historico";
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import type { CrmLeadStatus } from "@prisma/client";
+
+export async function assumirLeadAction(leadId: string) {
+  const sessao = await sessaoCrmObrigatoria();
+  exigirPapel(sessao, ["SDR", "ADMIN"]);
+
+  await prisma.$transaction(async (tx) => {
+    const lead = await tx.crmLead.findUnique({ where: { id: leadId } });
+    if (!lead) throw new Error("Lead não encontrado.");
+    if (lead.status !== "AGUARDANDO_SDR" || lead.sdrId) {
+      throw new Error("Esse lead já foi assumido por outro SDR.");
+    }
+
+    await tx.crmLead.update({
+      where: { id: leadId },
+      data: { sdrId: sessao.profileId, status: "EM_QUALIFICACAO" },
+    });
+    await registrarHistorico(tx, {
+      leadId,
+      usuarioId: sessao.userId,
+      acao: "Assumiu o lead.",
+    });
+  });
+
+  revalidatePath("/dashboard/sdr");
+}
+
+const qualificacaoSchema = z.object({
+  clienteRespondeu: z.coerce.boolean().optional().default(false),
+  interesse: z.string().optional(),
+  modeloVeiculo: z.string().optional(),
+  anoVeiculo: z.string().optional(),
+  cep: z.string().optional(),
+  cidade: z.string().optional(),
+  possuiSeguro: z.string().optional(),
+  seguradoraAtual: z.string().optional(),
+  motivoTroca: z.string().optional(),
+  melhorHorario: z.string().optional(),
+  observacoes: z.string().optional(),
+  temperatura: z.enum(["FRIO", "MORNO", "QUENTE"]),
+});
+
+export type QualificarLeadState = { erro?: string; ok?: boolean };
+
+export async function qualificarLeadAction(
+  leadId: string,
+  _prevState: QualificarLeadState,
+  formData: FormData
+): Promise<QualificarLeadState> {
+  const sessao = await sessaoCrmObrigatoria();
+  exigirPapel(sessao, ["SDR", "ADMIN"]);
+
+  const raw = Object.fromEntries(formData);
+  const parsed = qualificacaoSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { erro: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+  const dados = parsed.data;
+
+  const lead = await prisma.crmLead.findUnique({ where: { id: leadId } });
+  if (!lead) return { erro: "Lead não encontrado." };
+  if (lead.sdrId !== sessao.profileId && sessao.role !== "ADMIN") {
+    return { erro: "Esse lead não está atribuído a você." };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.qualification.upsert({
+      where: { leadId },
+      create: {
+        leadId,
+        sdrId: sessao.profileId,
+        clienteRespondeu: dados.clienteRespondeu ?? false,
+        interesse: dados.interesse || null,
+        modeloVeiculo: dados.modeloVeiculo || null,
+        anoVeiculo: dados.anoVeiculo || null,
+        cep: dados.cep || null,
+        cidade: dados.cidade || null,
+        possuiSeguro: dados.possuiSeguro ? dados.possuiSeguro === "sim" : null,
+        seguradoraAtual: dados.seguradoraAtual || null,
+        motivoTroca: dados.motivoTroca || null,
+        melhorHorario: dados.melhorHorario || null,
+        observacoes: dados.observacoes || null,
+        temperatura: dados.temperatura,
+      },
+      update: {
+        clienteRespondeu: dados.clienteRespondeu ?? false,
+        interesse: dados.interesse || null,
+        modeloVeiculo: dados.modeloVeiculo || null,
+        anoVeiculo: dados.anoVeiculo || null,
+        cep: dados.cep || null,
+        cidade: dados.cidade || null,
+        possuiSeguro: dados.possuiSeguro ? dados.possuiSeguro === "sim" : null,
+        seguradoraAtual: dados.seguradoraAtual || null,
+        motivoTroca: dados.motivoTroca || null,
+        melhorHorario: dados.melhorHorario || null,
+        observacoes: dados.observacoes || null,
+        temperatura: dados.temperatura,
+      },
+    });
+
+    const agora = new Date();
+    await tx.crmLead.update({
+      where: { id: leadId },
+      data: {
+        status: "AGUARDANDO_CLOSER",
+        temperatura: dados.temperatura,
+        qualificadoEm: agora,
+        enviadoParaCloserEm: agora,
+      },
+    });
+
+    await registrarHistorico(tx, { leadId, usuarioId: sessao.userId, acao: "Lead qualificado." });
+    await registrarHistorico(tx, {
+      leadId,
+      usuarioId: sessao.userId,
+      acao: "Enviou para o closer.",
+      detalhe: `Temperatura: ${dados.temperatura}`,
+    });
+  });
+
+  revalidatePath("/dashboard/sdr");
+  revalidatePath(`/dashboard/crm/leads/${leadId}`);
+  return { ok: true };
+}
+
+export async function descartarLeadAction(leadId: string, motivo: CrmLeadStatus) {
+  const sessao = await sessaoCrmObrigatoria();
+  exigirPapel(sessao, ["SDR", "ADMIN"]);
+
+  const lead = await prisma.crmLead.findUnique({ where: { id: leadId } });
+  if (!lead) throw new Error("Lead não encontrado.");
+  if (lead.sdrId !== sessao.profileId && sessao.role !== "ADMIN") {
+    throw new Error("Esse lead não está atribuído a você.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.crmLead.update({
+      where: { id: leadId },
+      data: { status: motivo, fechadoEm: new Date() },
+    });
+    await registrarHistorico(tx, {
+      leadId,
+      usuarioId: sessao.userId,
+      acao: "Lead descartado.",
+      detalhe: motivo,
+    });
+  });
+
+  revalidatePath("/dashboard/sdr");
+  revalidatePath(`/dashboard/crm/leads/${leadId}`);
+}

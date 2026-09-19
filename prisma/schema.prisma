@@ -1,0 +1,368 @@
+// Painel 300 — schema do banco
+// Migrado da estrutura em Google Sheets (Membros / Lancamentos / Leads / Visão Geral)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  GESTOR
+  EXECUTIVO
+  PROSPECTOR
+  SDR
+  CLOSER
+  GERENTE_PROSPECTOR
+  GERENTE_SDR
+  GERENTE_CLOSER
+}
+
+enum TeamTipo {
+  PROSPECCAO
+  SDR
+  CLOSER
+}
+
+enum CrmLeadStatus {
+  NOVO
+  PROSPECCAO
+  AGUARDANDO_SDR
+  EM_QUALIFICACAO
+  QUALIFICADO
+  AGUARDANDO_CLOSER
+  DISTRIBUIDO_CLOSER
+  EM_CONTATO
+  COTACAO
+  NEGOCIACAO
+  VENDA
+  PERDIDO
+  SEM_CONTATO
+  NUMERO_INVALIDO
+  SEM_INTERESSE
+  DUPLICADO
+  FORA_PERFIL
+  RETORNO_AGENDADO
+}
+
+enum Temperatura {
+  FRIO
+  MORNO
+  QUENTE
+}
+
+enum Cargo {
+  JUNIOR
+  SENIOR
+  MASTER
+}
+
+// Usuário + perfil operacional em uma única entidade (1:1 na prática, mas
+// separados por clareza: User cuida de auth, Profile cuida de regra de negócio)
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  role          Role      @default(EXECUTIVO)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  profile       Profile?
+  auditLogs     AuditLog[]
+  crmHistorico  CrmLeadHistorico[]
+  notificacoes  Notification[]
+
+  @@map("users")
+}
+
+model Profile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nome              String
+  cargo             Cargo    @default(JUNIOR)
+  ativo             Boolean  @default(true)
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+
+  lancamentos       LancamentoDiario[]
+  leads             Lead[]
+  campanhas         CampanhaParticipante[]
+
+  teamId            String?
+  team              Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  leadsProspectados CrmLead[] @relation("CrmLeadsProspector")
+  leadsSdr          CrmLead[] @relation("CrmLeadsSdr")
+  leadsCloser       CrmLead[] @relation("CrmLeadsCloser")
+  qualificacoes     Qualification[]
+  cotacoes          Quote[]
+  vendasCrm         Sale[]
+
+  @@map("profiles")
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  nome      String
+  tipo      TeamTipo
+  criadoEm  DateTime @default(now())
+
+  membros   Profile[]
+
+  @@map("teams")
+}
+
+// ================== CRM de Leads (Prospector → SDR → Closer) ==================
+
+model CrmLead {
+  id                   String         @id @default(cuid())
+  nome                 String
+  telefone             String
+  placa                String?
+  modeloVeiculo        String?
+  anoVeiculo           String?
+  cidade               String?
+  cep                  String?
+  origem               String?
+  observacaoInicial    String?
+
+  prospectorId         String
+  prospector           Profile        @relation("CrmLeadsProspector", fields: [prospectorId], references: [id])
+  sdrId                String?
+  sdr                  Profile?       @relation("CrmLeadsSdr", fields: [sdrId], references: [id])
+  closerId             String?
+  closer               Profile?       @relation("CrmLeadsCloser", fields: [closerId], references: [id])
+
+  status               CrmLeadStatus  @default(NOVO)
+  temperatura          Temperatura?
+
+  criadoEm             DateTime       @default(now())
+  qualificadoEm        DateTime?
+  enviadoParaCloserEm  DateTime?
+  distribuidoEm        DateTime?
+  fechadoEm            DateTime?
+  atualizadoEm         DateTime       @updatedAt
+
+  historico            CrmLeadHistorico[]
+  qualificacao         Qualification?
+  cotacoes             Quote[]
+  venda                Sale?
+
+  @@index([status])
+  @@index([prospectorId])
+  @@index([sdrId])
+  @@index([closerId])
+  @@map("crm_leads")
+}
+
+model CrmLeadHistorico {
+  id         String    @id @default(cuid())
+  leadId     String
+  lead       CrmLead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  usuarioId  String?
+  usuario    User?     @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  acao       String
+  detalhe    String?
+  criadoEm   DateTime  @default(now())
+
+  @@index([leadId])
+  @@map("crm_lead_historico")
+}
+
+model Qualification {
+  id                String       @id @default(cuid())
+  leadId            String       @unique
+  lead              CrmLead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  sdrId             String
+  sdr               Profile      @relation(fields: [sdrId], references: [id])
+
+  clienteRespondeu  Boolean      @default(false)
+  interesse         String?
+  modeloVeiculo     String?
+  anoVeiculo        String?
+  cep               String?
+  cidade            String?
+  possuiSeguro      Boolean?
+  seguradoraAtual   String?
+  motivoTroca       String?
+  melhorHorario     String?
+  observacoes       String?
+  temperatura       Temperatura
+
+  criadoEm          DateTime     @default(now())
+  atualizadoEm      DateTime     @updatedAt
+
+  @@map("qualifications")
+}
+
+model Quote {
+  id           String    @id @default(cuid())
+  leadId       String
+  lead         CrmLead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  closerId     String
+  closer       Profile   @relation(fields: [closerId], references: [id])
+  valor        Decimal?  @db.Decimal(10, 2)
+  observacoes  String?
+  criadoEm     DateTime  @default(now())
+
+  @@map("quotes")
+}
+
+model Sale {
+  id        String    @id @default(cuid())
+  leadId    String    @unique
+  lead      CrmLead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  closerId  String
+  closer    Profile   @relation(fields: [closerId], references: [id])
+  valor     Decimal?  @db.Decimal(10, 2)
+  criadoEm  DateTime  @default(now())
+
+  @@map("sales")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  usuario   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mensagem  String
+  lida      Boolean  @default(false)
+  criadoEm  DateTime @default(now())
+
+  @@index([userId, lida])
+  @@map("notifications")
+}
+
+// Um lançamento por pessoa por dia — espelha a aba "Lancamentos"
+model LancamentoDiario {
+  id            String   @id @default(cuid())
+  profileId     String
+  profile       Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  data          DateTime @db.Date
+
+  prospeccoes   Int      @default(0)
+  indicacoes    Int      @default(0)
+  ligacoes      Int      @default(0)
+  atendidas     Int      @default(0)
+  cotacoes      Int      @default(0)
+  followup      Int      @default(0)
+  vendas        Int      @default(0)
+  ativas        Int      @default(0)
+
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+
+  @@unique([profileId, data])
+  @@index([data])
+  @@map("lancamentos_diarios")
+}
+
+enum StatusLead {
+  PRIMEIRO_CONTATO
+  SEGUNDO_CONTATO
+  CAIXA_POSTAL
+  TELEFONE_INCORRETO
+  QUALIFICADO
+  NAO_POSSUI_CARRO
+  POSSUI_VEICULO_E_SEGURO
+  COTACAO
+  WHATSAPP
+  VENDA
+  SEM_INTERESSE
+  ATIVACAO
+}
+
+model Lead {
+  id             String       @id @default(cuid())
+  profileId      String
+  profile        Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  nomeLead       String
+  telefone       String?
+  placa          String?
+  status         StatusLead   @default(PRIMEIRO_CONTATO)
+  observacoes    String?
+  origemContato  String?
+  criadoEm       DateTime     @default(now())
+  atualizadoEm   DateTime     @updatedAt
+
+  historico      LeadStatusHistorico[]
+
+  @@index([profileId, status])
+  @@map("leads")
+}
+
+// Rastro de mudança de status — o Sheets não tinha isso; é ganho real da migração
+model LeadStatusHistorico {
+  id             String     @id @default(cuid())
+  leadId         String
+  lead           Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  statusAnterior StatusLead?
+  statusNovo     StatusLead
+  mudadoEm       DateTime   @default(now())
+
+  @@map("lead_status_historico")
+}
+
+// Configuração de comissão por cargo — hoje hardcoded no HTML; aqui vira dado editável
+model ComissaoConfig {
+  cargo               Cargo  @id
+  fixo                Int
+  ticketMedio         Int
+  bonusAtivasLimite   Int
+  bonusValor          Int
+
+  @@map("comissao_config")
+}
+
+model MetaMensal {
+  id         String   @id @default(cuid())
+  vigencia   DateTime @db.Date // primeiro dia do mês de vigência
+  metaVendas Int
+
+  @@unique([vigencia])
+  @@map("metas_mensais")
+}
+
+model Campanha {
+  id            String   @id @default(cuid())
+  nome          String
+  metaMetrica   String   // ex: "cotacoes"
+  metaValor     Int
+  inicio        DateTime @db.Date
+  fim           DateTime @db.Date
+  criadoEm      DateTime @default(now())
+
+  participantes CampanhaParticipante[]
+
+  @@map("campanhas")
+}
+
+model CampanhaParticipante {
+  campanhaId String
+  campanha   Campanha @relation(fields: [campanhaId], references: [id], onDelete: Cascade)
+  profileId  String
+  profile    Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@id([campanhaId, profileId])
+  @@map("campanha_participantes")
+}
+
+// Auditoria — quem mudou o quê. Não existia no sistema antigo.
+model AuditLog {
+  id            String   @id @default(cuid())
+  usuarioId     String?
+  usuario       User?    @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  tabela        String
+  registroId    String
+  acao          String   // CREATE | UPDATE | DELETE
+  dadosAntes    Json?
+  dadosDepois   Json?
+  criadoEm      DateTime @default(now())
+
+  @@index([tabela, registroId])
+  @@map("audit_log")
+}
