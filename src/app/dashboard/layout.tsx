@@ -8,15 +8,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const somenteAntigo = role === "ADMIN" || role === "GESTOR" || role === "EXECUTIVO";
 
+  const gerentes = ["GERENTE_PROSPECTOR", "GERENTE_SDR", "GERENTE_CLOSER"];
+
   const links = [
     { href: "/dashboard", label: "Visão geral", show: role === "ADMIN" || role === "GESTOR" },
     { href: "/dashboard/lancamento", label: "Lançar dados", show: somenteAntigo },
     { href: "/dashboard/meus-numeros", label: "Meus números", show: somenteAntigo },
     { href: "/dashboard/gestor", label: "Painel do gestor", show: role === "ADMIN" || role === "GESTOR" },
-    { href: "/dashboard/prospector", label: "Prospecção", show: role === "ADMIN" || role === "PROSPECTOR" || role === "GERENTE_PROSPECTOR" },
-    { href: "/dashboard/sdr", label: "Fila de SDR", show: role === "ADMIN" || role === "SDR" || role === "GERENTE_SDR" },
+    { href: "/dashboard/prospector", label: "Prospecção", show: role === "ADMIN" || role === "PROSPECTOR" },
+    { href: "/dashboard/gerente-prospector", label: "Prospecção (equipe)", show: role === "ADMIN" || role === "GERENTE_PROSPECTOR" },
+    { href: "/dashboard/sdr", label: "Fila de SDR", show: role === "ADMIN" || role === "SDR" },
+    { href: "/dashboard/gerente-sdr", label: "SDR (equipe)", show: role === "ADMIN" || role === "GERENTE_SDR" },
     { href: "/dashboard/closer", label: "Meus leads", show: role === "ADMIN" || role === "CLOSER" },
     { href: "/dashboard/gerente-closer", label: "Distribuição", show: role === "ADMIN" || role === "GERENTE_CLOSER" },
+    { href: "/dashboard/busca", label: "Busca", show: role === "ADMIN" || gerentes.includes(role) },
     { href: "/dashboard/admin", label: "Administração", show: role === "ADMIN" },
   ];
 

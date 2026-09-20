@@ -15,6 +15,7 @@ import {
   Target,
   Phone,
   Handshake,
+  Search,
 } from "lucide-react";
 
 type NavLink = { href: string; label: string; show: boolean };
@@ -26,10 +27,13 @@ const ICONS: Record<string, ComponentType<{ size?: number; strokeWidth?: number 
   "/dashboard/gestor": Users,
   "/dashboard/admin": ShieldCheck,
   "/dashboard/prospector": Target,
+  "/dashboard/gerente-prospector": Target,
   "/dashboard/sdr": Phone,
+  "/dashboard/gerente-sdr": Phone,
   "/dashboard/em-breve": Handshake,
   "/dashboard/closer": Handshake,
   "/dashboard/gerente-closer": Users,
+  "/dashboard/busca": Search,
 };
 
 export function Sidebar({
