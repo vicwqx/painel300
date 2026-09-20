@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { sessaoCrmObrigatoria, exigirPapel } from "@/lib/crm/sessao";
 import { registrarHistorico } from "@/lib/crm/historico";
+import { idsDosUsuariosComPapel, notificarUsuarios } from "@/lib/crm/notificacoes";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -58,6 +59,9 @@ export async function criarLeadCrmAction(
       usuarioId: null,
       acao: "Lead enviado para a fila do SDR.",
     });
+
+    const sdrIds = await idsDosUsuariosComPapel(tx, "SDR");
+    await notificarUsuarios(tx, sdrIds, `Novo lead disponível para qualificação: ${lead.nome}.`);
   });
 
   revalidatePath("/dashboard/prospector");

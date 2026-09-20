@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { sessaoCrmObrigatoria, exigirPapel } from "@/lib/crm/sessao";
 import { registrarHistorico } from "@/lib/crm/historico";
+import { idsDosUsuariosComPapel, notificarUsuarios } from "@/lib/crm/notificacoes";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { CrmLeadStatus } from "@prisma/client";
@@ -123,6 +124,9 @@ export async function qualificarLeadAction(
       acao: "Enviou para o closer.",
       detalhe: `Temperatura: ${dados.temperatura}`,
     });
+
+    const gerentesIds = await idsDosUsuariosComPapel(tx, "GERENTE_CLOSER");
+    await notificarUsuarios(tx, gerentesIds, `Lead qualificado aguardando distribuição: ${lead.nome}.`);
   });
 
   revalidatePath("/dashboard/sdr");

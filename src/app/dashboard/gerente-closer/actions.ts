@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { sessaoCrmObrigatoria, exigirPapel } from "@/lib/crm/sessao";
 import { registrarHistorico } from "@/lib/crm/historico";
+import { notificarUsuarios } from "@/lib/crm/notificacoes";
 import { revalidatePath } from "next/cache";
 
 export async function distribuirLeadAction(leadId: string, closerId: string) {
@@ -30,6 +31,8 @@ export async function distribuirLeadAction(leadId: string, closerId: string) {
       acao: "Lead distribuído.",
       detalhe: `Para ${closer.nome}`,
     });
+
+    await notificarUsuarios(tx, [closer.userId], `Novo lead qualificado recebido: ${lead.nome}.`);
   });
 
   revalidatePath("/dashboard/gerente-closer");

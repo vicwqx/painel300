@@ -27,6 +27,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const valid = await bcrypt.compare(password, user.passwordHash);
         if (!valid) return null;
 
+        await prisma.auditLog.create({
+          data: { usuarioId: user.id, tabela: "users", registroId: user.id, acao: "Login" },
+        });
+
         return {
           id: user.id,
           email: user.email,
@@ -48,6 +52,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     async session({ session, token }) {
       if (session.user) {
+        (session.user as typeof session.user & { id: string; role: string; profileId: string | null }).id =
+          token.sub as string;
         (session.user as typeof session.user & { role: string; profileId: string | null }).role =
           token.role as string;
         (session.user as typeof session.user & { role: string; profileId: string | null }).profileId =

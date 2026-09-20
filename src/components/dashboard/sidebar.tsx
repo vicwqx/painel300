@@ -16,9 +16,11 @@ import {
   Phone,
   Handshake,
   Search,
+  Bell,
+  History,
 } from "lucide-react";
 
-type NavLink = { href: string; label: string; show: boolean };
+type NavLink = { href: string; label: string; show: boolean; badge?: number };
 
 const ICONS: Record<string, ComponentType<{ size?: number; strokeWidth?: number }>> = {
   "/dashboard": LayoutDashboard,
@@ -26,6 +28,7 @@ const ICONS: Record<string, ComponentType<{ size?: number; strokeWidth?: number 
   "/dashboard/meus-numeros": UserRound,
   "/dashboard/gestor": Users,
   "/dashboard/admin": ShieldCheck,
+  "/dashboard/admin/auditoria": History,
   "/dashboard/prospector": Target,
   "/dashboard/gerente-prospector": Target,
   "/dashboard/sdr": Phone,
@@ -34,6 +37,7 @@ const ICONS: Record<string, ComponentType<{ size?: number; strokeWidth?: number 
   "/dashboard/closer": Handshake,
   "/dashboard/gerente-closer": Users,
   "/dashboard/busca": Search,
+  "/dashboard/notificacoes": Bell,
 };
 
 export function Sidebar({
@@ -81,7 +85,12 @@ export function Sidebar({
                 <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-accent" aria-hidden />
               )}
               <Icone size={16} strokeWidth={2} />
-              <span className="relative">{l.label}</span>
+              <span className="relative flex-1">{l.label}</span>
+              {!!l.badge && l.badge > 0 && (
+                <span className="relative flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-[#04211d]">
+                  {l.badge > 9 ? "9+" : l.badge}
+                </span>
+              )}
             </Link>
           );
         })}

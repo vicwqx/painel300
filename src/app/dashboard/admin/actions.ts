@@ -22,8 +22,8 @@ export async function criarUsuarioAction(
   formData: FormData
 ): Promise<CriarUsuarioState> {
   const session = await auth();
-  const papel = (session?.user as { role?: string } | undefined)?.role;
-  if (papel !== "ADMIN") return { erro: "Sem permissão." };
+  const user = session?.user as { id?: string; role?: string } | undefined;
+  if (user?.role !== "ADMIN") return { erro: "Sem permissão." };
 
   const parsed = schema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
@@ -35,12 +35,22 @@ export async function criarUsuarioAction(
   if (existente) return { erro: "Já existe um usuário com esse e-mail." };
 
   const passwordHash = await bcrypt.hash(senha, 10);
-  await prisma.user.create({
+  const novoUsuario = await prisma.user.create({
     data: {
       email: email.toLowerCase().trim(),
       passwordHash,
       role,
       profile: { create: { nome, cargo } },
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      usuarioId: user.id ?? null,
+      tabela: "users",
+      registroId: novoUsuario.id,
+      acao: "Criação de usuário",
+      dadosDepois: { email: novoUsuario.email, role, nome },
     },
   });
 
@@ -52,9 +62,19 @@ export type AtualizarStatusState = { erro?: string; ok?: boolean };
 
 export async function alternarAtivoAction(profileId: string, ativo: boolean) {
   const session = await auth();
-  const papel = (session?.user as { role?: string } | undefined)?.role;
-  if (papel !== "ADMIN") throw new Error("Sem permissão.");
+  const user = session?.user as { id?: string; role?: string } | undefined;
+  if (user?.role !== "ADMIN") throw new Error("Sem permissão.");
 
   await prisma.profile.update({ where: { id: profileId }, data: { ativo } });
+
+  await prisma.auditLog.create({
+    data: {
+      usuarioId: user.id ?? null,
+      tabela: "profiles",
+      registroId: profileId,
+      acao: ativo ? "Reativação de perfil" : "Desativação de perfil",
+    },
+  });
+
   revalidatePath("/dashboard/admin");
 }

@@ -1,10 +1,16 @@
 import { auth, signOut } from "@/lib/auth";
 import { Sidebar } from "@/components/dashboard/sidebar";
+import { prisma } from "@/lib/prisma";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   const role = (session?.user as { role?: string } | undefined)?.role ?? "EXECUTIVO";
+  const userId = (session?.user as { id?: string } | undefined)?.id;
   const nome = session?.user?.name ?? session?.user?.email ?? "";
+
+  const notificacoesNaoLidas = userId
+    ? await prisma.notification.count({ where: { userId, lida: false } })
+    : 0;
 
   const somenteAntigo = role === "ADMIN" || role === "GESTOR" || role === "EXECUTIVO";
 
@@ -22,7 +28,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     { href: "/dashboard/closer", label: "Meus leads", show: role === "ADMIN" || role === "CLOSER" },
     { href: "/dashboard/gerente-closer", label: "Distribuição", show: role === "ADMIN" || role === "GERENTE_CLOSER" },
     { href: "/dashboard/busca", label: "Busca", show: role === "ADMIN" || gerentes.includes(role) },
+    { href: "/dashboard/notificacoes", label: "Notificações", show: true, badge: notificacoesNaoLidas },
     { href: "/dashboard/admin", label: "Administração", show: role === "ADMIN" },
+    { href: "/dashboard/admin/auditoria", label: "Auditoria", show: role === "ADMIN" },
   ];
 
   async function fazerLogout() {
