@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { calcularPeriodo } from "@/lib/calculos/periodo";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { PeriodPicker } from "@/components/dashboard/period-picker";
+import { NovoUsuarioForm } from "@/components/dashboard/novo-usuario-form";
+import { criarProspectorAction } from "./actions";
 import { Suspense } from "react";
 import type { CrmLeadStatus } from "@prisma/client";
 
@@ -76,6 +78,12 @@ export default async function GerenteProspectorPage({
           <PeriodPicker periodoAtual={periodoKey} inicioAtual={params.inicio ?? inicio} fimAtual={params.fim ?? fim} />
         </Suspense>
       </div>
+
+      <NovoUsuarioForm
+        action={criarProspectorAction}
+        titulo="Novo prospector"
+        descricao="Cria login e perfil de prospector direto pra sua equipe."
+      />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Card className="p-4">

@@ -3,7 +3,9 @@
 import { prisma } from "@/lib/prisma";
 import { sessaoCrmObrigatoria, exigirPapel } from "@/lib/crm/sessao";
 import { registrarHistorico } from "@/lib/crm/historico";
+import { criarUsuarioComPapelFixo, type CriarUsuarioSimplesState } from "@/lib/crm/criar-usuario";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 export async function redistribuirLeadAction(leadId: string, novoSdrId: string) {
   const sessao = await sessaoCrmObrigatoria();
@@ -30,4 +32,30 @@ export async function redistribuirLeadAction(leadId: string, novoSdrId: string) 
 
   revalidatePath("/dashboard/gerente-sdr");
   revalidatePath("/dashboard/sdr");
+}
+
+const criarUsuarioSchema = z.object({
+  nome: z.string().min(2, "Nome muito curto"),
+  email: z.string().email("E-mail inválido"),
+  senha: z.string().min(6, "Senha precisa ter ao menos 6 caracteres"),
+});
+
+export async function criarSdrAction(
+  _prevState: CriarUsuarioSimplesState,
+  formData: FormData
+): Promise<CriarUsuarioSimplesState> {
+  const sessao = await sessaoCrmObrigatoria();
+  exigirPapel(sessao, ["GERENTE_SDR", "ADMIN"]);
+
+  const parsed = criarUsuarioSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { erro: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+
+  const resultado = await criarUsuarioComPapelFixo({
+    ...parsed.data,
+    role: "SDR",
+    criadoPorUserId: sessao.userId,
+  });
+
+  if (resultado.ok) revalidatePath("/dashboard/gerente-sdr");
+  return resultado;
 }

@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DistribuirSelect } from "./distribuir-select";
+import { NovoUsuarioForm } from "@/components/dashboard/novo-usuario-form";
+import { criarCloserAction } from "./actions";
 import { TEMPERATURA_LABEL, TEMPERATURA_TONE } from "@/lib/crm/labels";
 import Link from "next/link";
 import type { CrmLeadStatus } from "@prisma/client";
@@ -56,6 +58,12 @@ export default async function GerenteCloserPage() {
         <h1 className="text-xl font-semibold">Distribuição para closers</h1>
         <p className="text-sm text-muted">Leads qualificados aguardando um closer.</p>
       </div>
+
+      <NovoUsuarioForm
+        action={criarCloserAction}
+        titulo="Novo closer"
+        descricao="Cria login e perfil de closer direto pra sua equipe."
+      />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Card className="p-4">

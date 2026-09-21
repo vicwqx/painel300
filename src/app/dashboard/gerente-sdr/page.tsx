@@ -3,6 +3,8 @@ import { calcularPeriodo } from "@/lib/calculos/periodo";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { PeriodPicker } from "@/components/dashboard/period-picker";
 import { RedistribuirSelect } from "./redistribuir-select";
+import { NovoUsuarioForm } from "@/components/dashboard/novo-usuario-form";
+import { criarSdrAction } from "./actions";
 import { Suspense } from "react";
 import Link from "next/link";
 import type { CrmLeadStatus } from "@prisma/client";
@@ -77,6 +79,12 @@ export default async function GerenteSdrPage({
           <PeriodPicker periodoAtual={periodoKey} inicioAtual={params.inicio ?? inicio} fimAtual={params.fim ?? fim} />
         </Suspense>
       </div>
+
+      <NovoUsuarioForm
+        action={criarSdrAction}
+        titulo="Novo SDR"
+        descricao="Cria login e perfil de SDR direto pra sua equipe."
+      />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Card className="p-4">
