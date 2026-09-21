@@ -160,3 +160,100 @@ export async function descartarLeadAction(leadId: string, motivo: CrmLeadStatus)
   revalidatePath("/dashboard/sdr");
   revalidatePath(`/dashboard/crm/leads/${leadId}`);
 }
+
+const criarEQualificarSchema = z.object({
+  nome: z.string().min(2, "Nome muito curto"),
+  telefone: z.string().min(8, "Telefone inválido"),
+  placa: z.string().optional(),
+  modeloVeiculo: z.string().optional(),
+  anoVeiculo: z.string().optional(),
+  cidade: z.string().optional(),
+  cep: z.string().optional(),
+  origem: z.string().optional(),
+  interesse: z.string().optional(),
+  possuiSeguro: z.string().optional(),
+  seguradoraAtual: z.string().optional(),
+  motivoTroca: z.string().optional(),
+  melhorHorario: z.string().optional(),
+  observacoes: z.string().optional(),
+  temperatura: z.enum(["FRIO", "MORNO", "QUENTE"]),
+});
+
+export type CriarEQualificarLeadState = { erro?: string; ok?: boolean };
+
+/**
+ * Autonomia do SDR: cria o lead e já qualifica na mesma etapa, pulando a fila
+ * de prospecção — usado quando o próprio SDR conseguiu o contato direto.
+ */
+export async function criarEQualificarLeadAction(
+  _prevState: CriarEQualificarLeadState,
+  formData: FormData
+): Promise<CriarEQualificarLeadState> {
+  const sessao = await sessaoCrmObrigatoria();
+  exigirPapel(sessao, ["SDR", "ADMIN"]);
+
+  const parsed = criarEQualificarSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    return { erro: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+  const dados = parsed.data;
+
+  await prisma.$transaction(async (tx) => {
+    const agora = new Date();
+    const lead = await tx.crmLead.create({
+      data: {
+        nome: dados.nome,
+        telefone: dados.telefone,
+        placa: dados.placa || null,
+        modeloVeiculo: dados.modeloVeiculo || null,
+        anoVeiculo: dados.anoVeiculo || null,
+        cidade: dados.cidade || null,
+        origem: dados.origem || "SDR (contato direto)",
+        observacaoInicial: dados.observacoes || null,
+        prospectorId: sessao.profileId,
+        sdrId: sessao.profileId,
+        status: "AGUARDANDO_CLOSER",
+        temperatura: dados.temperatura,
+        qualificadoEm: agora,
+        enviadoParaCloserEm: agora,
+      },
+    });
+
+    await tx.qualification.create({
+      data: {
+        leadId: lead.id,
+        sdrId: sessao.profileId,
+        clienteRespondeu: true,
+        interesse: dados.interesse || null,
+        modeloVeiculo: dados.modeloVeiculo || null,
+        anoVeiculo: dados.anoVeiculo || null,
+        cep: dados.cep || null,
+        cidade: dados.cidade || null,
+        possuiSeguro: dados.possuiSeguro ? dados.possuiSeguro === "sim" : null,
+        seguradoraAtual: dados.seguradoraAtual || null,
+        motivoTroca: dados.motivoTroca || null,
+        melhorHorario: dados.melhorHorario || null,
+        observacoes: dados.observacoes || null,
+        temperatura: dados.temperatura,
+      },
+    });
+
+    await registrarHistorico(tx, {
+      leadId: lead.id,
+      usuarioId: sessao.userId,
+      acao: "Criou o lead diretamente (contato próprio do SDR).",
+    });
+    await registrarHistorico(tx, {
+      leadId: lead.id,
+      usuarioId: sessao.userId,
+      acao: "Qualificou e enviou direto para o closer.",
+      detalhe: `Temperatura: ${dados.temperatura}`,
+    });
+
+    const gerentesIds = await idsDosUsuariosComPapel(tx, "GERENTE_CLOSER");
+    await notificarUsuarios(tx, gerentesIds, `Lead qualificado aguardando distribuição: ${lead.nome}.`);
+  });
+
+  revalidatePath("/dashboard/sdr");
+  return { ok: true };
+}

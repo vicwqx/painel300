@@ -40,9 +40,17 @@ export default async function SdrPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Olá, {sessao.nome.split(" ")[0]}</h1>
-        <p className="text-sm text-muted">Fila de qualificação.</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">Olá, {sessao.nome.split(" ")[0]}</h1>
+          <p className="text-sm text-muted">Fila de qualificação.</p>
+        </div>
+        <Link
+          href="/dashboard/sdr/novo"
+          className="inline-flex items-center gap-2 rounded-md bg-accent px-3.5 py-2 text-sm font-semibold text-[#04211d] transition-colors hover:bg-accent-strong"
+        >
+          + Novo lead
+        </Link>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
