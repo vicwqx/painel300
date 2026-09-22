@@ -20,6 +20,7 @@ enum Role {
   GERENTE_PROSPECTOR
   GERENTE_SDR
   GERENTE_CLOSER
+  GERENTE
 }
 
 enum TeamTipo {
@@ -53,6 +54,16 @@ enum Temperatura {
   FRIO
   MORNO
   QUENTE
+}
+
+enum TipoAtividadeSdr {
+  OPORTUNIDADE
+  QUALIFICACAO
+}
+
+enum TipoUso {
+  PARTICULAR
+  APLICATIVO
 }
 
 enum Cargo {
@@ -102,6 +113,10 @@ model Profile {
   qualificacoes     Qualification[]
   cotacoes          Quote[]
   vendasCrm         Sale[]
+
+  sdrLancamentos     SdrLancamento[]
+  sdrProducaoDiaria  SdrProducaoDiaria[]
+  closerLancamentos  CloserLancamento[]
 
   @@map("profiles")
 }
@@ -235,6 +250,74 @@ model Notification {
 
   @@index([userId, lida])
   @@map("notifications")
+}
+
+// ================== Fase 6: lançamento diário simplificado (SDR / Closer) ==================
+// Sem fila, sem distribuição, sem transferência obrigatória — cada pessoa registra a própria produção.
+
+model SdrLancamento {
+  id             String            @id @default(cuid())
+  sdrId          String
+  sdr            Profile           @relation(fields: [sdrId], references: [id], onDelete: Cascade)
+  data           DateTime          @db.Date
+
+  nome           String
+  telefone       String?
+  cep            String?
+  cidade         String?
+  placa          String?
+  modelo         String?
+  ano            String?
+  origem         String?
+
+  tipoAtividade  TipoAtividadeSdr
+  tipoUso        TipoUso?
+  temSeguro      Boolean?
+  seguroAtual    String?
+  motivo         String?
+  observacao     String?
+  temperatura    Temperatura?
+
+  criadoEm       DateTime          @default(now())
+  atualizadoEm   DateTime          @updatedAt
+
+  @@index([sdrId, data])
+  @@map("sdr_lancamentos")
+}
+
+model SdrProducaoDiaria {
+  id            String   @id @default(cuid())
+  sdrId         String
+  sdr           Profile  @relation(fields: [sdrId], references: [id], onDelete: Cascade)
+  data          DateTime @db.Date
+  ligacoes      Int      @default(0)
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+
+  @@unique([sdrId, data])
+  @@map("sdr_producao_diaria")
+}
+
+model CloserLancamento {
+  id                        String   @id @default(cuid())
+  closerId                  String
+  closer                    Profile  @relation(fields: [closerId], references: [id], onDelete: Cascade)
+  data                      DateTime @db.Date
+
+  oportunidadesRecebidas    Int      @default(0)
+  oportunidadesTrabalhadas  Int      @default(0)
+  retornos                  Int      @default(0)
+  contatosProdutivos        Int      @default(0)
+  cotacoes                  Int      @default(0)
+  vendas                    Int      @default(0)
+  semProdutividade          Int      @default(0)
+  observacoes               String?
+
+  criadoEm                  DateTime @default(now())
+  atualizadoEm              DateTime @updatedAt
+
+  @@unique([closerId, data])
+  @@map("closer_lancamentos")
 }
 
 // Um lançamento por pessoa por dia — espelha a aba "Lancamentos"

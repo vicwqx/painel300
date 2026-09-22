@@ -15,6 +15,8 @@ const REGRAS: { prefixo: string; exato?: boolean; papeisPermitidos: string[] }[]
   { prefixo: "/dashboard/gerente-sdr", papeisPermitidos: ["ADMIN", "GERENTE_SDR"] },
   { prefixo: "/dashboard/closer", papeisPermitidos: ["ADMIN", "CLOSER"] },
   { prefixo: "/dashboard/gerente-closer", papeisPermitidos: ["ADMIN", "GERENTE_CLOSER"] },
+  { prefixo: "/dashboard/gerente", exato: true, papeisPermitidos: ["ADMIN", "GERENTE"] },
+  { prefixo: "/dashboard/gerente/", papeisPermitidos: ["ADMIN", "GERENTE"] },
 ];
 
 

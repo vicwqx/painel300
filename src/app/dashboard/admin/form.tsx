@@ -57,12 +57,13 @@ export function CriarUsuarioForm() {
           >
             <option value="EXECUTIVO">Executivo (Equipe 300)</option>
             <option value="GESTOR">Gestor (Equipe 300)</option>
-            <option value="PROSPECTOR">Prospector</option>
             <option value="SDR">SDR</option>
             <option value="CLOSER">Closer</option>
-            <option value="GERENTE_PROSPECTOR">Gerente de Prospector</option>
-            <option value="GERENTE_SDR">Gerente de SDR</option>
-            <option value="GERENTE_CLOSER">Gerente de Closer</option>
+            <option value="GERENTE">Gerente (equipe única)</option>
+            <option value="PROSPECTOR">Prospector (legado)</option>
+            <option value="GERENTE_PROSPECTOR">Gerente de Prospector (legado)</option>
+            <option value="GERENTE_SDR">Gerente de SDR (legado)</option>
+            <option value="GERENTE_CLOSER">Gerente de Closer (legado)</option>
             <option value="ADMIN">Admin</option>
           </select>
         </div>

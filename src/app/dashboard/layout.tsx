@@ -14,22 +14,36 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const somenteAntigo = role === "ADMIN" || role === "GESTOR" || role === "EXECUTIVO";
 
-  const gerentes = ["GERENTE_PROSPECTOR", "GERENTE_SDR", "GERENTE_CLOSER"];
-
   const links = [
     { href: "/dashboard", label: "Visão geral", show: role === "ADMIN" || role === "GESTOR" },
     { href: "/dashboard/lancamento", label: "Lançar dados", show: somenteAntigo },
     { href: "/dashboard/meus-numeros", label: "Meus números", show: somenteAntigo },
     { href: "/dashboard/gestor", label: "Painel do gestor", show: role === "ADMIN" || role === "GESTOR" },
-    { href: "/dashboard/prospector", label: "Prospecção", show: role === "ADMIN" || role === "PROSPECTOR" },
-    { href: "/dashboard/gerente-prospector", label: "Prospecção (equipe)", show: role === "ADMIN" || role === "GERENTE_PROSPECTOR" },
-    { href: "/dashboard/sdr", label: "Fila de SDR", show: role === "ADMIN" || role === "SDR" },
-    { href: "/dashboard/gerente-sdr", label: "SDR (equipe)", show: role === "ADMIN" || role === "GERENTE_SDR" },
-    { href: "/dashboard/closer", label: "Meus leads", show: role === "ADMIN" || role === "CLOSER" },
-    { href: "/dashboard/gerente-closer", label: "Distribuição", show: role === "ADMIN" || role === "GERENTE_CLOSER" },
-    { href: "/dashboard/busca", label: "Busca", show: role === "ADMIN" || gerentes.includes(role) },
+
+    // Operação comercial simplificada — SDR / Closer / Gerente único
+    { href: "/dashboard/sdr", label: "Dashboard", show: role === "SDR" },
+    { href: "/dashboard/sdr/lancamento", label: "Lançamento Diário", show: role === "SDR" },
+    { href: "/dashboard/sdr/lancamentos", label: "Meus Lançamentos", show: role === "SDR" },
+
+    { href: "/dashboard/closer", label: "Dashboard", show: role === "CLOSER" },
+    { href: "/dashboard/closer/lancamento", label: "Lançamento Diário", show: role === "CLOSER" },
+    { href: "/dashboard/closer/lancamentos", label: "Meus Lançamentos", show: role === "CLOSER" },
+
+    { href: "/dashboard/gerente", label: "Dashboard Geral", show: role === "ADMIN" || role === "GERENTE" },
+    { href: "/dashboard/gerente/sdr", label: "Dashboard SDR", show: role === "ADMIN" || role === "GERENTE" },
+    { href: "/dashboard/gerente/closer", label: "Dashboard Closer", show: role === "ADMIN" || role === "GERENTE" },
+    { href: "/dashboard/gerente/relatorios", label: "Relatórios", show: role === "ADMIN" || role === "GERENTE" },
+    { href: "/dashboard/gerente/equipe", label: "Equipe", show: role === "ADMIN" || role === "GERENTE" },
+
+    // Papéis antigos do pipeline (Prospector/Closer distribuído) — mantidos só pra quem ainda estiver nesses papéis
+    { href: "/dashboard/prospector", label: "Prospecção", show: role === "PROSPECTOR" },
+    { href: "/dashboard/gerente-prospector", label: "Prospecção (equipe)", show: role === "GERENTE_PROSPECTOR" },
+    { href: "/dashboard/gerente-sdr", label: "SDR (equipe)", show: role === "GERENTE_SDR" },
+    { href: "/dashboard/gerente-closer", label: "Distribuição", show: role === "GERENTE_CLOSER" },
+
+    { href: "/dashboard/busca", label: "Busca", show: role === "ADMIN" || role === "GERENTE" },
     { href: "/dashboard/notificacoes", label: "Notificações", show: true, badge: notificacoesNaoLidas },
-    { href: "/dashboard/admin", label: "Administração", show: role === "ADMIN" },
+    { href: "/dashboard/admin", label: "Usuários", show: role === "ADMIN" },
     { href: "/dashboard/admin/auditoria", label: "Auditoria", show: role === "ADMIN" },
   ];
 

@@ -12,12 +12,13 @@ export function rotaPadraoDoPapel(papel: string): string {
       return "/dashboard/sdr";
     case "CLOSER":
       return "/dashboard/closer";
+    case "GERENTE":
+      return "/dashboard/gerente";
     case "GERENTE_CLOSER":
       return "/dashboard/gerente-closer";
     case "GERENTE_PROSPECTOR":
-      return "/dashboard/gerente-prospector";
     case "GERENTE_SDR":
-      return "/dashboard/gerente-sdr";
+      return "/dashboard/em-breve";
     default:
       return "/dashboard/lancamento";
   }

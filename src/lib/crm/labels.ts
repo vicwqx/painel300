@@ -1,4 +1,4 @@
-import type { CrmLeadStatus, Temperatura } from "@prisma/client";
+import type { CrmLeadStatus, Temperatura, TipoAtividadeSdr, TipoUso } from "@prisma/client";
 
 export const STATUS_LABEL: Record<CrmLeadStatus, string> = {
   NOVO: "Novo",
@@ -69,3 +69,18 @@ export const MOTIVOS_DESCARTE: { value: CrmLeadStatus; label: string }[] = [
   { value: "DUPLICADO", label: "Lead duplicado" },
   { value: "FORA_PERFIL", label: "Fora do perfil" },
 ];
+
+export const TIPO_ATIVIDADE_LABEL: Record<TipoAtividadeSdr, string> = {
+  OPORTUNIDADE: "Oportunidade",
+  QUALIFICACAO: "Qualificação",
+};
+
+export const TIPO_ATIVIDADE_TONE: Record<TipoAtividadeSdr, "teal" | "amber" | "red" | "neutral"> = {
+  OPORTUNIDADE: "amber",
+  QUALIFICACAO: "teal",
+};
+
+export const TIPO_USO_LABEL: Record<TipoUso, string> = {
+  PARTICULAR: "Particular",
+  APLICATIVO: "Aplicativo",
+};

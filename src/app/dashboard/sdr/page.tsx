@@ -1,124 +1,156 @@
 import { prisma } from "@/lib/prisma";
 import { sessaoCrmObrigatoria } from "@/lib/crm/sessao";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { AssumirButton } from "./assumir-button";
-import { STATUS_LABEL, STATUS_TONE } from "@/lib/crm/labels";
+import { LigacoesWidget } from "./ligacoes-widget";
+import { SdrTrendChart, type PontoSdr } from "./sdr-trend-chart";
+import { TEMPERATURA_LABEL, TEMPERATURA_EMOJI } from "@/lib/crm/labels";
+import { somarDias } from "@/lib/calculos/periodo";
 import Link from "next/link";
+import type { Temperatura } from "@prisma/client";
 
-function dataHora(d: Date) {
-  return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+function isoHoje() {
+  const d = new Date();
+  const off = d.getTimezoneOffset();
+  return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
 }
+function inicioDaSemanaStr(hoje: string) {
+  const d = new Date(hoje + "T00:00:00");
+  const dow = d.getDay();
+  const diff = dow === 0 ? -6 : 1 - dow;
+  return somarDias(hoje, diff);
+}
+function inicioDoMesStr(hoje: string) {
+  return hoje.slice(0, 7) + "-01";
+}
+
+async function contarPeriodo(sdrId: string, inicio: string, fim: string) {
+  const [oportunidades, qualificacoes, ligacoesRows] = await Promise.all([
+    prisma.sdrLancamento.count({
+      where: { sdrId, tipoAtividade: "OPORTUNIDADE", data: { gte: new Date(inicio), lte: new Date(fim + "T23:59:59") } },
+    }),
+    prisma.sdrLancamento.count({
+      where: { sdrId, tipoAtividade: "QUALIFICACAO", data: { gte: new Date(inicio), lte: new Date(fim + "T23:59:59") } },
+    }),
+    prisma.sdrProducaoDiaria.findMany({
+      where: { sdrId, data: { gte: new Date(inicio), lte: new Date(fim + "T23:59:59") } },
+      select: { ligacoes: true },
+    }),
+  ]);
+  const ligacoes = ligacoesRows.reduce((s, r) => s + r.ligacoes, 0);
+  return { oportunidades, qualificacoes, ligacoes };
+}
+
+const TEMPERATURAS: Temperatura[] = ["QUENTE", "MORNO", "FRIO"];
 
 export default async function SdrPage() {
   const sessao = await sessaoCrmObrigatoria();
+  const hoje = isoHoje();
+  const inicioSemana = inicioDaSemanaStr(hoje);
+  const inicioMes = inicioDoMesStr(hoje);
 
-  const [fila, meusLeads, qualificadosHoje, qualificadosMes] = await Promise.all([
-    prisma.crmLead.findMany({
-      where: { status: "AGUARDANDO_SDR", sdrId: null },
-      include: { prospector: { select: { nome: true } } },
-      orderBy: { criadoEm: "asc" },
-      take: 30,
-    }),
-    prisma.crmLead.findMany({
-      where: { sdrId: sessao.profileId, status: "EM_QUALIFICACAO" },
-      orderBy: { criadoEm: "asc" },
-    }),
-    prisma.crmLead.count({
-      where: {
-        sdrId: sessao.profileId,
-        qualificadoEm: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
-      },
-    }),
-    prisma.crmLead.count({
-      where: {
-        sdrId: sessao.profileId,
-        qualificadoEm: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
-      },
-    }),
-  ]);
+  const [dadosHoje, dadosSemana, dadosMes, ligacoesHojeRow, totalLeadsMes, temperaturaRows, ultimos7Raw] =
+    await Promise.all([
+      contarPeriodo(sessao.profileId, hoje, hoje),
+      contarPeriodo(sessao.profileId, inicioSemana, hoje),
+      contarPeriodo(sessao.profileId, inicioMes, hoje),
+      prisma.sdrProducaoDiaria.findUnique({ where: { sdrId_data: { sdrId: sessao.profileId, data: new Date(hoje) } } }),
+      prisma.sdrLancamento.count({
+        where: { sdrId: sessao.profileId, data: { gte: new Date(inicioMes) } },
+      }),
+      prisma.sdrLancamento.groupBy({
+        by: ["temperatura"],
+        where: { sdrId: sessao.profileId, data: { gte: new Date(inicioMes) }, temperatura: { not: null } },
+        _count: { _all: true },
+      }),
+      Promise.all(
+        Array.from({ length: 7 }, (_, i) => somarDias(hoje, i - 6)).map(async (dia) => {
+          const c = await contarPeriodo(sessao.profileId, dia, dia);
+          return { dia: dia.slice(5).split("-").reverse().join("/"), ...c };
+        })
+      ),
+    ]);
+
+  const ultimos7: PontoSdr[] = ultimos7Raw;
+  const temperaturaMap = new Map(temperaturaRows.map((r) => [r.temperatura, r._count._all]));
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Olá, {sessao.nome.split(" ")[0]}</h1>
-          <p className="text-sm text-muted">Fila de qualificação.</p>
+          <p className="text-sm text-muted">Sua produtividade.</p>
         </div>
-        <Link
-          href="/dashboard/sdr/novo"
-          className="inline-flex items-center gap-2 rounded-md bg-accent px-3.5 py-2 text-sm font-semibold text-[#04211d] transition-colors hover:bg-accent-strong"
-        >
-          + Novo lead
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Card className="p-4">
-          <p className="mb-1.5 text-[11px] uppercase tracking-wide text-muted">Na fila agora</p>
-          <p className="font-num text-2xl font-semibold">{fila.length}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="mb-1.5 text-[11px] uppercase tracking-wide text-muted">Comigo (em andamento)</p>
-          <p className="font-num text-2xl font-semibold text-amber">{meusLeads.length}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="mb-1.5 text-[11px] uppercase tracking-wide text-muted">Qualificados hoje</p>
-          <p className="font-num text-2xl font-semibold text-teal">{qualificadosHoje}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="mb-1.5 text-[11px] uppercase tracking-wide text-muted">Qualificados no mês</p>
-          <p className="font-num text-2xl font-semibold text-teal">{qualificadosMes}</p>
-        </Card>
+        <div className="flex gap-2">
+          <Link
+            href="/dashboard/sdr/lancamento"
+            className="inline-flex items-center gap-2 rounded-md bg-accent px-3.5 py-2 text-sm font-semibold text-[#04211d] transition-colors hover:bg-accent-strong"
+          >
+            + Novo lançamento
+          </Link>
+          <Link
+            href="/dashboard/sdr/lancamentos"
+            className="inline-flex items-center gap-2 rounded-md border border-border-strong px-3.5 py-2 text-sm text-foreground transition-colors hover:bg-surface-3"
+          >
+            Meus lançamentos
+          </Link>
+        </div>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Meus leads (em qualificação)</CardTitle>
-        </CardHeader>
-        {meusLeads.length === 0 ? (
-          <p className="text-sm text-muted">Nenhum lead assumido no momento — pegue um da fila abaixo.</p>
-        ) : (
-          <div className="divide-y divide-border">
-            {meusLeads.map((l) => (
-              <div key={l.id} className="flex flex-wrap items-center gap-3 py-2.5 text-sm">
-                <Link href={`/dashboard/sdr/${l.id}`} className="flex-1 font-medium hover:text-accent hover:underline">
-                  {l.nome}
-                </Link>
-                <span className="text-xs text-muted">{l.telefone}</span>
-                <Badge tone={STATUS_TONE[l.status]}>{STATUS_LABEL[l.status]}</Badge>
-              </div>
-            ))}
+        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Ligações de hoje</p>
+        <LigacoesWidget ligacoesHoje={ligacoesHojeRow?.ligacoes ?? 0} />
+      </Card>
+
+      {[
+        { titulo: "Hoje", dados: dadosHoje },
+        { titulo: "Semana", dados: dadosSemana },
+        { titulo: "Mês", dados: dadosMes },
+      ].map((bloco) => (
+        <div key={bloco.titulo}>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-2">{bloco.titulo}</p>
+          <div className="grid grid-cols-3 gap-3">
+            <Card className="p-4">
+              <p className="mb-1.5 text-[11px] uppercase tracking-wide text-muted">Ligações</p>
+              <p className="font-num text-2xl font-semibold">{bloco.dados.ligacoes}</p>
+            </Card>
+            <Card className="p-4">
+              <p className="mb-1.5 text-[11px] uppercase tracking-wide text-muted">Oportunidades</p>
+              <p className="font-num text-2xl font-semibold text-amber">{bloco.dados.oportunidades}</p>
+            </Card>
+            <Card className="p-4">
+              <p className="mb-1.5 text-[11px] uppercase tracking-wide text-muted">Qualificações</p>
+              <p className="font-num text-2xl font-semibold text-teal">{bloco.dados.qualificacoes}</p>
+            </Card>
           </div>
-        )}
+        </div>
+      ))}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Últimos 7 dias</CardTitle>
+        </CardHeader>
+        <SdrTrendChart dados={ultimos7} />
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Fila de leads disponíveis</CardTitle>
-          <p className="mt-1 text-xs text-muted">Ordenada por quem chegou primeiro.</p>
+          <CardTitle>Leads do mês</CardTitle>
         </CardHeader>
-        {fila.length === 0 ? (
-          <p className="text-sm text-muted">Fila vazia no momento.</p>
-        ) : (
-          <div className="divide-y divide-border">
-            {fila.map((l) => (
-              <div key={l.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                <div>
-                  <p className="text-sm font-semibold">{l.nome}</p>
-                  <p className="text-xs text-muted">
-                    {l.telefone} {l.placa ? `· ${l.placa}` : ""} · Prospector: {l.prospector.nome}
-                  </p>
-                  {l.observacaoInicial && (
-                    <p className="mt-1 text-xs italic text-muted-2">&ldquo;{l.observacaoInicial}&rdquo;</p>
-                  )}
-                  <p className="mt-0.5 text-[10px] text-muted-2">Criado em {dataHora(l.criadoEm)}</p>
-                </div>
-                <AssumirButton leadId={l.id} />
+        <div className="flex flex-wrap items-center gap-4">
+          <div>
+            <p className="text-[11px] uppercase tracking-wide text-muted">Total cadastrado</p>
+            <p className="font-num text-2xl font-semibold">{totalLeadsMes}</p>
+          </div>
+          <div className="flex gap-3">
+            {TEMPERATURAS.map((t) => (
+              <div key={t} className="text-center">
+                <p className="text-lg">{TEMPERATURA_EMOJI[t]}</p>
+                <p className="font-num text-sm font-semibold">{temperaturaMap.get(t) ?? 0}</p>
+                <p className="text-[10px] text-muted-2">{TEMPERATURA_LABEL[t]}</p>
               </div>
             ))}
           </div>
-        )}
+        </div>
       </Card>
     </div>
   );
